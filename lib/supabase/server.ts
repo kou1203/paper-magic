@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { Database } from "./database.types";
 import { getSupabaseEnv } from "./env";
 
 /**
@@ -11,7 +12,7 @@ export async function createClient() {
   const cookieStore = await cookies();
   const { url, publishableKey } = getSupabaseEnv();
 
-  return createServerClient(url, publishableKey, {
+  return createServerClient<Database>(url, publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -22,8 +23,8 @@ export async function createClient() {
             cookieStore.set(name, value, options);
           }
         } catch {
-          // Server Components cannot write cookies. Session refresh will be
-          // handled by the proxy added with authentication (KO-6).
+          // Server Components cannot write cookies. That is fine: proxy.ts
+          // refreshes the session and writes the cookies on every request.
         }
       },
     },
