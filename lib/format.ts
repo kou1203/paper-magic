@@ -49,6 +49,11 @@ export function formatYearMonth(value: YearMonth): string {
   return `${year}年${month}月`;
 }
 
+/** Formats `2026-06` as `6月` (no year), for axis labels and short notes. */
+export function formatMonthShort(value: YearMonth): string {
+  return `${parseYearMonth(value).month}月`;
+}
+
 /**
  * Moves a month forwards or backwards, crossing year boundaries.
  * Returns `null` when the result would fall outside MIN_YEAR–MAX_YEAR.

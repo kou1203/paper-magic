@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatJPY,
   formatDateTime,
+  formatMonthShort,
   formatYearMonth,
   isYearMonth,
   resolveYearMonth,
@@ -54,6 +55,13 @@ describe("formatYearMonth", () => {
   it("drops the leading zero of the month", () => {
     expect(formatYearMonth("2026-06")).toBe("2026年6月");
     expect(formatYearMonth("2024-12")).toBe("2024年12月");
+  });
+});
+
+describe("formatMonthShort", () => {
+  it("drops the year and the leading zero", () => {
+    expect(formatMonthShort("2024-06")).toBe("6月");
+    expect(formatMonthShort("2024-12")).toBe("12月");
   });
 });
 
