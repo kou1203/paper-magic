@@ -71,7 +71,7 @@ describe("categoryBreakdown", () => {
     const result = categoryBreakdown(rows);
     expect(result.map((r) => r.key)).toEqual(["c7", "c6", "c5", "c4", "c3", "other"]);
     expect(result.at(-1)).toMatchObject({ name: "その他", total: 300 });
-    expect(result.reduce((sum, r) => sum + r.share, 0)).toBeCloseTo(1);
+    expect(result.reduce((sum, r) => sum + (r.share ?? 0), 0)).toBeCloseTo(1);
   });
 
   it("does not fold a single leftover category", () => {
@@ -84,6 +84,22 @@ describe("categoryBreakdown", () => {
     expect(result.map((r) => r.key)).toEqual(["a", "b"]);
   });
 
+  it("keeps shares within 0-100% when a category is negative (refunds)", () => {
+    const result = categoryBreakdown([row("meeting", "会議費", 50, 10000), row("supplies", "消耗品費", 40, -3000)]);
+    expect(result).toEqual([
+      { key: "meeting", name: "会議費", total: 10000, share: 1 },
+      { key: "supplies", name: "消耗品費", total: -3000, share: null },
+    ]);
+  });
+
+  it("never folds negative categories into その他", () => {
+    const rows = [1, 2, 3, 4, 5, 6, 7].map((n) => row(`c${n}`, `科目${n}`, n, n * 100));
+    rows.push(row("refund", "返金", 99, -500));
+    const result = categoryBreakdown(rows);
+    expect(result.find((r) => r.key === "other")?.total).toBe(300);
+    expect(result.at(-1)).toEqual({ key: "refund", name: "返金", total: -500, share: null });
+  });
+
   it("handles an empty month", () => {
     expect(categoryBreakdown([])).toEqual([]);
   });
@@ -91,5 +107,6 @@ describe("categoryBreakdown", () => {
   it("formats shares as whole percents", () => {
     expect(formatShare(0.336)).toBe("34%");
     expect(formatShare(0)).toBe("0%");
+    expect(formatShare(null)).toBe("—");
   });
 });

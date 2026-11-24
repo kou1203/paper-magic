@@ -4,7 +4,9 @@ import { formatJPY } from "@/lib/format";
 /**
  * Category breakdown as horizontal bars. Each row is named by its label, so
  * all bars share one hue (colour must not change with rank). Amount and share
- * are written out on every row, so the bar is never the only carrier.
+ * are written out on every row, so the bar is never the only carrier. A
+ * category whose net total is negative (refunds) shows its amount, "—" for
+ * the share, and no bar.
  */
 export function CategoryBars({ items }: { items: CategoryShare[] }) {
   return (
@@ -20,7 +22,7 @@ export function CategoryBars({ items }: { items: CategoryShare[] }) {
           <div aria-hidden className="h-2 bg-canvas">
             <div
               className={["h-full rounded-r-[4px]", item.key === "other" ? "bg-mist" : "bg-primary"].join(" ")}
-              style={{ width: `${Math.max(0, Math.min(1, item.share)) * 100}%` }}
+              style={{ width: `${Math.max(0, Math.min(1, item.share ?? 0)) * 100}%` }}
             />
           </div>
         </li>

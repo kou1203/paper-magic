@@ -11,7 +11,7 @@ import { KindTag } from "@/components/ui/SourceTag";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TREND_MONTHS, getDashboardData, resolveDashboardMonth, type DashboardData } from "@/lib/analytics/queries";
 import { changeRatio, formatChange } from "@/lib/analytics/summary";
-import { formatDateTime, formatJPY, formatYearMonth, type YearMonth } from "@/lib/format";
+import { formatDateTime, formatJPY, formatMonthShort, formatYearMonth, type YearMonth } from "@/lib/format";
 
 export const metadata: Metadata = { title: "ダッシュボード" };
 
@@ -35,7 +35,7 @@ function Unit({ children }: { children: ReactNode }) {
 }
 
 function monthName(month: YearMonth | null): string {
-  return month ? `${Number(month.slice(5, 7))}月` : "前月";
+  return month ? formatMonthShort(month) : "前月";
 }
 
 function Kpis({ data }: { data: DashboardData }) {
@@ -50,7 +50,7 @@ function Kpis({ data }: { data: DashboardData }) {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr_1fr]">
       <section className={`${PANEL} px-6 pt-5 pb-[18px]`} aria-labelledby="kpi-total">
         <h2 id="kpi-total" className={KPI_LABEL}>
-          今月の経費合計
+          {formatMonthShort(data.month)}の経費合計
         </h2>
         <p className={KPI_VALUE}>{formatJPY(data.current.total)}</p>
         <p className="mt-2 text-xs text-muted">
@@ -78,7 +78,7 @@ function Kpis({ data }: { data: DashboardData }) {
       </section>
       <section className={`${PANEL} px-6 pt-5 pb-[18px]`} aria-labelledby="kpi-count">
         <h2 id="kpi-count" className={KPI_LABEL}>
-          今月の登録件数
+          {formatMonthShort(data.month)}の登録件数
         </h2>
         <p className={KPI_VALUE}>
           {data.current.count}
@@ -117,7 +117,7 @@ function Charts({ data }: { data: DashboardData }) {
         )}
       </section>
       <section className={`${PANEL} px-6 pt-[22px] pb-5`}>
-        <CardTitle note="今月">カテゴリ別内訳</CardTitle>
+        <CardTitle note={formatYearMonth(data.month)}>カテゴリ別内訳</CardTitle>
         {data.categories.length > 0 ? (
           <CategoryBars items={data.categories} />
         ) : (

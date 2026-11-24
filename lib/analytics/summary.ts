@@ -54,13 +54,19 @@ export type CategoryShare = {
   key: string;
   name: string;
   total: number;
-  /** Fraction of the month's total, 0–1. */
-  share: number;
+  /**
+   * Fraction of the month's spending (positive categories only), 0–1.
+   * Null for a category whose net total is negative (refunds exceed spending):
+   * it has no meaningful share and is listed after the others.
+   */
+  share: number | null;
 };
 
 /**
- * Categories by amount, largest first. Beyond `limit`, the rest fold into one
- * "その他" row so the breakdown stays readable. Ties keep the master order.
+ * Categories by amount, largest first. Beyond `limit`, the remaining positive
+ * categories fold into one "その他" row so the breakdown stays readable. Ties
+ * keep the master order. Shares are taken against the sum of positive
+ * categories, so a refund-heavy category cannot push others above 100%.
  */
 export function categoryBreakdown(
   rows: readonly { category_code: string | null; category_name: string | null; sort_order: number | null; total_jpy: number | null }[],
@@ -76,20 +82,23 @@ export function categoryBreakdown(
     }))
     .sort((a, b) => b.total - a.total || a.order - b.order);
 
-  const grand = items.reduce((sum, item) => sum + item.total, 0);
-  const share = (total: number) => (grand === 0 ? 0 : total / grand);
+  const positive = items.filter((item) => item.total > 0);
+  const negative = items.filter((item) => item.total < 0);
+  const spending = positive.reduce((sum, item) => sum + item.total, 0);
+  const share = (total: number) => (spending === 0 ? 0 : total / spending);
 
-  const head = items.length > limit + 1 ? items.slice(0, limit) : items;
-  const rest = items.slice(head.length);
+  const head = positive.length > limit + 1 ? positive.slice(0, limit) : positive;
+  const rest = positive.slice(head.length);
   const result: CategoryShare[] = head.map(({ key, name, total }) => ({ key, name, total, share: share(total) }));
   if (rest.length > 0) {
     const total = rest.reduce((sum, item) => sum + item.total, 0);
     result.push({ key: "other", name: "その他", total, share: share(total) });
   }
+  for (const { key, name, total } of negative) result.push({ key, name, total, share: null });
   return result;
 }
 
-/** Rounds a share to a whole percent for labels: 0.336 → "34%". */
-export function formatShare(share: number): string {
-  return `${Math.round(share * 100)}%`;
+/** Rounds a share to a whole percent for labels: 0.336 → "34%", null → "—". */
+export function formatShare(share: number | null): string {
+  return share === null ? "—" : `${Math.round(share * 100)}%`;
 }

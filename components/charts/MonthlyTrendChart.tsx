@@ -1,17 +1,14 @@
 import type { MonthTotal } from "@/lib/analytics/summary";
-import { formatJPY, formatYearMonth, type YearMonth } from "@/lib/format";
+import { formatJPY, formatMonthShort, formatYearMonth, type YearMonth } from "@/lib/format";
 
 const PLOT_HEIGHT = 160;
-
-function monthLabel(month: YearMonth): string {
-  return `${Number(month.slice(5, 7))}月`;
-}
 
 /**
  * Monthly totals as columns, oldest first. One series, so no legend: the card
  * title names it. The selected month is the accent; the rest step back.
- * Every column carries its value on the cap, a hover/focus tooltip, and the
- * same numbers are in a visually hidden table for screen readers.
+ * Every column carries its value on the cap and a hover tooltip. The plot is
+ * hidden from assistive tech (nothing in it is focusable); screen readers and
+ * keyboard users get the same numbers from the visually hidden table.
  */
 export function MonthlyTrendChart({ data, selected }: { data: MonthTotal[]; selected: YearMonth }) {
   const max = Math.max(0, ...data.map((d) => d.total));
@@ -33,8 +30,7 @@ export function MonthlyTrendChart({ data, selected }: { data: MonthTotal[]; sele
           return (
             <div
               key={d.month}
-              tabIndex={0}
-              className="group relative flex h-full flex-1 flex-col items-center justify-end gap-1.5 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="group relative flex h-full flex-1 flex-col items-center justify-end gap-1.5"
             >
               <span
                 className={[
@@ -42,16 +38,16 @@ export function MonthlyTrendChart({ data, selected }: { data: MonthTotal[]; sele
                   isSelected ? "font-bold text-ink" : "text-muted",
                 ].join(" ")}
               >
-                {d.total === 0 ? "—" : d.total.toLocaleString("ja-JP")}
+                {d.total === 0 ? "—" : formatJPY(d.total).replace("¥", "")}
               </span>
               <span
                 className={["block w-6 rounded-t-[4px]", isSelected ? "bg-primary" : "bg-mist"].join(" ")}
                 style={{ height: Math.max(height, d.total > 0 ? 2 : 0) }}
               />
-              {/* Tooltip: hover or keyboard focus. Text stays in ink, not the bar colour. */}
+              {/* Tooltip on hover. Text stays in ink, not the bar colour. */}
               <span
                 className={[
-                  "pointer-events-none absolute z-10 hidden border border-line bg-white px-2.5 py-1.5 text-left text-[11.5px] whitespace-nowrap text-ink shadow-[0_8px_16px_-10px_rgba(16,35,60,0.35)] group-hover:block group-focus-visible:block",
+                  "pointer-events-none absolute z-10 hidden border border-line bg-white px-2.5 py-1.5 text-left text-[11.5px] whitespace-nowrap text-ink shadow-[0_8px_16px_-10px_rgba(16,35,60,0.35)] group-hover:block",
                   openLeft ? "right-[calc(50%+18px)]" : "left-[calc(50%+18px)]",
                 ].join(" ")}
                 style={{ bottom: Math.min(Math.max(height - 20, 0), PLOT_HEIGHT - 44) }}
@@ -74,7 +70,7 @@ export function MonthlyTrendChart({ data, selected }: { data: MonthTotal[]; sele
               d.month === selected ? "font-bold text-ink" : "text-muted",
             ].join(" ")}
           >
-            {monthLabel(d.month)}
+            {formatMonthShort(d.month)}
           </span>
         ))}
       </div>
