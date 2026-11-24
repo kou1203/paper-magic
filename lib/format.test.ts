@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatJPY,
+  formatDateTime,
   formatYearMonth,
   isYearMonth,
   resolveYearMonth,
@@ -92,6 +93,29 @@ describe("resolveYearMonth", () => {
       expect(resolveYearMonth(value, now)).toBe("2026-11");
     },
   );
+});
+
+describe("formatDateTime", () => {
+  const now = new Date("2026-11-24T03:00:00Z");
+
+  it("shows Japan time without the year for this year", () => {
+    // 09:42 UTC = 18:42 JST
+    expect(formatDateTime("2026-06-24T09:42:00Z", now)).toBe("6月24日 18:42");
+  });
+
+  it("pads hours and minutes", () => {
+    expect(formatDateTime("2026-01-04T23:05:00Z", now)).toBe("1月5日 08:05");
+  });
+
+  it("adds the year for other years, judged in Japan time", () => {
+    expect(formatDateTime("2024-06-24T09:42:00Z", now)).toBe("2024年6月24日 18:42");
+    // 2025-12-31 16:00 UTC is already 2026-01-01 01:00 in Tokyo.
+    expect(formatDateTime("2025-12-31T16:00:00Z", now)).toBe("1月1日 01:00");
+  });
+
+  it("rejects invalid input", () => {
+    expect(() => formatDateTime("not a date", now)).toThrow(RangeError);
+  });
 });
 
 describe("yearMonthOf", () => {

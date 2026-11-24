@@ -152,11 +152,13 @@ export type Database = {
       }
       uploads: {
         Row: {
+          byte_size: number | null
           created_at: string
           error_message: string | null
           file_name: string
           id: string
           kind: Database["public"]["Enums"]["upload_kind"]
+          processing_started_at: string | null
           row_count: number
           skipped_count: number
           status: Database["public"]["Enums"]["upload_status"]
@@ -165,11 +167,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          byte_size?: number | null
           created_at?: string
           error_message?: string | null
           file_name: string
           id?: string
           kind: Database["public"]["Enums"]["upload_kind"]
+          processing_started_at?: string | null
           row_count?: number
           skipped_count?: number
           status?: Database["public"]["Enums"]["upload_status"]
@@ -178,11 +182,13 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          byte_size?: number | null
           created_at?: string
           error_message?: string | null
           file_name?: string
           id?: string
           kind?: Database["public"]["Enums"]["upload_kind"]
+          processing_started_at?: string | null
           row_count?: number
           skipped_count?: number
           status?: Database["public"]["Enums"]["upload_status"]
