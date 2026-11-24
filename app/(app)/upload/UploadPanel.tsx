@@ -65,12 +65,13 @@ async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T
   await Promise.all(runners);
 }
 
-/** One-line progress summary for screen readers, e.g. "5件中3件完了、1件失敗". */
+/** One-line progress summary, e.g. "8件中8件処理済み（うち失敗3件）". */
 function summarise(items: Item[]): string {
+  if (items.length === 0) return "";
   const finished = items.filter((item) => item.status !== "uploading").length;
   const failed = items.filter((item) => item.status === "error").length;
-  const base = `${items.length}件中${finished}件完了`;
-  return failed > 0 ? `${base}、${failed}件失敗` : base;
+  const base = `${items.length}件中${finished}件処理済み`;
+  return failed > 0 ? `${base}（うち失敗${failed}件）` : base;
 }
 
 export function UploadPanel() {
@@ -166,8 +167,14 @@ export function UploadPanel() {
     [router, update],
   );
 
+  const summary = summarise(items);
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Always mounted, so screen readers announce even the first update. */}
+      <p role="status" className="sr-only">
+        {summary}
+      </p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <DropZone
           group="statement"
@@ -211,9 +218,9 @@ export function UploadPanel() {
             <h2 id="upload-progress-title" className="text-[11.5px] font-semibold tracking-[0.16em] text-muted">
               送信状況
             </h2>
-            {/* Only the summary is live, so a 20-file drop is not read out line by line. */}
-            <p role="status" className="num text-xs text-muted">
-              {summarise(items)}
+            {/* Visual copy of the live summary above; the list itself is not live. */}
+            <p aria-hidden className="num text-xs text-muted">
+              {summary}
             </p>
             {!busy ? (
               <button
