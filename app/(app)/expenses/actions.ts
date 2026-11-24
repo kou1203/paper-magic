@@ -75,13 +75,15 @@ export async function updateExpense(
     })
     .eq("id", id)
     .eq("user_id", user.id)
+    // Receipts waiting for review are handled on the review screen, not here.
+    .eq("status", "confirmed")
     .select("id");
   if (error) {
     if (isUnknownCategory(error)) return { fieldErrors: { categoryId: "勘定科目を選択してください" } };
     console.error("updateExpense failed", error);
     return { error: SAVE_FAILED };
   }
-  if (data.length === 0) return { error: "経費が見つかりませんでした。削除された可能性があります。" };
+  if (data.length === 0) return { error: "経費が見つからないか、確認待ちのため編集できません。" };
   refresh();
   return { ok: true };
 }
@@ -98,6 +100,8 @@ export async function deleteExpenses(ids: unknown): Promise<BulkResult> {
     .delete()
     .in("id", valid)
     .eq("user_id", user.id)
+    // Receipts waiting for review are handled on the review screen, not here.
+    .eq("status", "confirmed")
     .select("id");
   if (error) {
     console.error("deleteExpenses failed", error);
@@ -122,6 +126,8 @@ export async function setExpensesCategory(ids: unknown, categoryId: unknown): Pr
     .update({ category_id: category.data })
     .in("id", valid)
     .eq("user_id", user.id)
+    // Receipts waiting for review are handled on the review screen, not here.
+    .eq("status", "confirmed")
     .select("id");
   if (error) {
     if (isUnknownCategory(error)) return { ok: false, error: "勘定科目を選択してください。" };

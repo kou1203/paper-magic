@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useId, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { buttonClassName } from "@/components/ui/Button";
 import { SourceTag } from "@/components/ui/SourceTag";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -18,16 +18,29 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
   const names = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
-  const [message, setMessage] = useState<string>("");
+  // `n` changes on every message so a repeated text is still announced.
+  const [message, setMessage] = useState<{ text: string; n: number }>({ text: "", n: 0 });
   const [pending, startTransition] = useTransition();
   const bulkCategoryId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
+  // Receipts waiting for review are handled on the review screen, so only
+  // confirmed rows can be selected for bulk actions.
+  const selectable = useMemo(() => rows.filter((r) => r.status === "confirmed"), [rows]);
   // Drop selections that are no longer on the page (after delete or paging).
   const visibleSelected = useMemo(
-    () => new Set(rows.filter((r) => selected.has(r.id)).map((r) => r.id)),
-    [rows, selected],
+    () => new Set(selectable.filter((r) => selected.has(r.id)).map((r) => r.id)),
+    [selectable, selected],
   );
-  const allSelected = rows.length > 0 && visibleSelected.size === rows.length;
+  const allSelected = selectable.length > 0 && visibleSelected.size === selectable.length;
+  const someSelected = visibleSelected.size > 0 && !allSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  const announce = (text: string) => setMessage((m) => ({ text, n: m.n + 1 }));
 
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -36,7 +49,7 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
       else next.add(id);
       return next;
     });
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectable.map((r) => r.id)));
 
   const closeEditor = useCallback(() => setEditing(null), []);
 
@@ -45,9 +58,12 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
       const result = await action();
       if (result.ok) {
         setSelected(new Set());
-        setMessage(`${result.affected}件を${done}しました`);
+        announce(`${result.affected}件を${done}しました`);
+        // The button that was pressed is gone (row deleted or bulk bar hidden):
+        // move focus to the list heading so keyboard users keep their place.
+        headingRef.current?.focus();
       } else {
-        setMessage(result.error);
+        announce(result.error);
       }
     });
 
@@ -70,19 +86,32 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
     runBulk(() => deleteExpenses([row.id]), "削除");
   };
 
+  // Always mounted, even when the list is empty, so results are announced.
+  const liveRegion = (
+    <>
+      <h2 ref={headingRef} tabIndex={-1} className="sr-only">
+        経費の一覧
+      </h2>
+      <p role="status" className="sr-only">
+        <span key={message.n}>{message.text}</span>
+      </p>
+    </>
+  );
+
   if (rows.length === 0) {
     return (
-      <p className="border-t border-line py-12 text-center text-[13px] tracking-[0.06em] text-muted">
-        条件に合う経費はありません。
-      </p>
+      <>
+        {liveRegion}
+        <p className="border-t border-line py-12 text-center text-[13px] tracking-[0.06em] text-muted">
+          条件に合う経費はありません。
+        </p>
+      </>
     );
   }
 
   return (
     <>
-      <p role="status" className="sr-only">
-        {message}
-      </p>
+      {liveRegion}
       {visibleSelected.size > 0 ? (
         <form
           action={onBulkCategory}
@@ -139,10 +168,12 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
           <tr className="border-b border-line text-left">
             <th scope="col" className={`${HEAD} pl-[18px]`}>
               <input
+                ref={selectAllRef}
                 type="checkbox"
                 checked={allSelected}
                 onChange={toggleAll}
-                aria-label="このページの経費をすべて選択"
+                disabled={selectable.length === 0}
+                aria-label="このページの確定済み経費をすべて選択"
                 className="m-0 accent-primary"
               />
             </th>
@@ -171,6 +202,8 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
                     type="checkbox"
                     checked={visibleSelected.has(row.id)}
                     onChange={() => toggle(row.id)}
+                    disabled={pendingReview}
+                    title={pendingReview ? "確認待ちの経費は確認画面で操作します" : undefined}
                     aria-label={`${shortDate(row.date)} ${row.description} を選択`}
                     className="m-0 accent-primary"
                   />
@@ -194,9 +227,10 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
                   <StatusBadge status={row.status} />
                 </td>
                 <td className={`${CELL} pr-[18px] text-right text-xs whitespace-nowrap`}>
-                  {pendingReview && row.upload_id ? (
+                  {pendingReview ? (
+                    // Pending receipts are confirmed, fixed or discarded on the review screen.
                     <Link
-                      href={{ pathname: "/upload/review", query: { upload: row.upload_id } }}
+                      href={{ pathname: "/upload/review", query: row.upload_id ? { upload: row.upload_id } : {} }}
                       className="font-semibold text-primary hover:text-primary-hover"
                     >
                       確認する →
@@ -229,9 +263,9 @@ export function ExpensesTable({ rows, categories }: { rows: ExpenseRow[]; catego
         </tbody>
       </table>
 
-      {message ? (
+      {message.text ? (
         <p aria-hidden className="border-t border-line px-[18px] py-2 text-xs text-muted">
-          {message}
+          {message.text}
         </p>
       ) : null}
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -14,7 +15,7 @@ import {
   parseExpenseFilters,
   type ExpenseFilters,
 } from "@/lib/expenses/filters";
-import { listCategories, listExpenses, type Category } from "@/lib/expenses/queries";
+import { MAX_ROWS, listCategories, listExpenses, type Category } from "@/lib/expenses/queries";
 import { formatJPY, formatYearMonth } from "@/lib/format";
 import { AddExpenseButton } from "./AddExpenseButton";
 import { ExpensesTable } from "./ExpensesTable";
@@ -57,15 +58,17 @@ function FilterBar({
   categories,
   count,
   total,
+  truncated,
 }: {
   filters: ExpenseFilters;
   categories: Category[];
   count: number;
   total: number;
+  truncated: boolean;
 }) {
   return (
-    <form
-      method="get"
+    // next/form: a GET form that navigates client-side instead of reloading.
+    <Form
       action="/expenses"
       role="search"
       aria-label="経費の絞り込み"
@@ -116,8 +119,13 @@ function FilterBar({
       <p className="num ml-auto text-[12.5px] text-muted">
         {count}件 ・ 合計{" "}
         <b className="font-serif text-[15px] text-ink">{formatJPY(total)}</b>
+        {truncated ? (
+          <span className="ml-2 font-semibold text-ink">
+            （合計は先頭{MAX_ROWS.toLocaleString("ja-JP")}件分です。条件を絞ってください）
+          </span>
+        ) : null}
       </p>
-    </form>
+    </Form>
   );
 }
 
@@ -181,7 +189,13 @@ async function ExpensesSection({ searchParams }: { searchParams: SearchParams })
       ) : (
         <h2 className="sr-only">{formatYearMonth(filters.month)}の経費</h2>
       )}
-      <FilterBar filters={filters} categories={categories} count={result.count} total={result.total} />
+      <FilterBar
+        filters={filters}
+        categories={categories}
+        count={result.count}
+        total={result.total}
+        truncated={result.truncated}
+      />
       <section className="border border-line bg-white">
         <ExpensesTable rows={result.rows} categories={categories} />
         <Pagination filters={filters} page={result.page} lastPage={result.lastPage} count={result.count} />

@@ -98,6 +98,10 @@ describe("keywordFilter", () => {
     expect(keywordFilter("a,b.(c)")).toBe('description.ilike."%a,b.(c)%",vendor.ilike."%a,b.(c)%"');
   });
 
+  it("leaves * as is (PostgREST treats it as a LIKE wildcard; harmless, documented)", () => {
+    expect(keywordFilter("A*B")).toBe('description.ilike."%A*B%",vendor.ilike."%A*B%"');
+  });
+
   it("escapes LIKE wildcards and quotes", () => {
     // 100%_"x" → LIKE 100\%\_"x" → quoted with \ and " escaped
     expect(keywordFilter('100%_"x"')).toBe(

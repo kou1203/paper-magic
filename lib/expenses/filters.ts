@@ -77,6 +77,9 @@ export function monthDateRange(month: YearMonth): { from: string; to: string } {
  * PostgREST `or` filter matching the keyword in description or vendor.
  * The value is double-quoted so commas, dots and parentheses are literal, and
  * LIKE wildcards in the keyword are escaped so "%" matches a percent sign.
+ * PostgREST also reads "*" as "%" in like patterns and offers no escape for it,
+ * so a keyword containing "*" matches more broadly. That only widens the
+ * user's own results; it is not a security issue.
  */
 export function keywordFilter(q: string): string {
   const like = q.replace(/[\\%_]/g, (c) => `\\${c}`);

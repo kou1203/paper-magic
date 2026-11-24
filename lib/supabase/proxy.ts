@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { AUTH_CALLBACK_PATH, LOGIN_PATH, isPublicPath, loginPathFor, safeNextPath } from "@/lib/auth/paths";
+import { AUTH_CALLBACK_PATH, LOGIN_PATH, isDataPath, isPublicPath, loginPathFor, safeNextPath } from "@/lib/auth/paths";
 import type { Database } from "./database.types";
 import { getSupabaseEnv } from "./env";
 
@@ -51,6 +51,13 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // is not on Supabase's redirect allow list. Forward them to the callback.
   if (pathname === "/" && searchParams.has("code")) {
     return redirectKeepingSession(request, response, authHeaders, `${AUTH_CALLBACK_PATH}${search}`);
+  }
+
+  if (!signedIn && isDataPath(pathname)) {
+    return new NextResponse("ログインが必要です。", {
+      status: 401,
+      headers: { ...authHeaders, "Cache-Control": "private, no-store" },
+    });
   }
 
   if (!signedIn && !isPublicPath(pathname)) {

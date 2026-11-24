@@ -67,10 +67,12 @@ function applyFilters<
 
 export type ExpensePage = {
   rows: ExpenseRow[];
-  /** Matching expenses across all pages. */
+  /** Matching expenses across all pages (exact, from the database). */
   count: number;
   /** Sum of amount_jpy across all pages. */
   total: number;
+  /** True when more than MAX_ROWS match, so `total` covers only the first MAX_ROWS. */
+  truncated: boolean;
   page: number;
   lastPage: number;
 };
@@ -80,39 +82,55 @@ export async function listExpenses(filters: ExpenseFilters): Promise<ExpensePage
   const user = await getCurrentUser();
   const supabase = await createClient();
 
-  // Count and total: amounts of every match (aggregates are off in PostgREST).
-  const amounts = await applyFilters(
-    supabase.from("expenses").select("amount_jpy"),
-    user.id,
-    filters,
-  ).limit(MAX_ROWS);
+  const fetchPage = (page: number) => {
+    const offset = (page - 1) * PAGE_SIZE;
+    return applyFilters(supabase.from("expenses").select(EXPENSE_COLUMNS), user.id, filters)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(offset, offset + PAGE_SIZE - 1);
+  };
+
+  // Totals (aggregates are off in PostgREST, so sum the amounts) and the
+  // requested page run in parallel; the page is refetched only if it is past
+  // the end.
+  const [amounts, firstTry] = await Promise.all([
+    applyFilters(supabase.from("expenses").select("amount_jpy", { count: "exact" }), user.id, filters).limit(
+      MAX_ROWS,
+    ),
+    fetchPage(filters.page),
+  ]);
   if (amounts.error) throw new Error(`経費を読み込めませんでした: ${amounts.error.message}`);
 
-  const count = amounts.data.length;
+  const count = amounts.count ?? amounts.data.length;
   const total = amounts.data.reduce((sum, row) => sum + row.amount_jpy, 0);
   const last = lastPage(count);
   const page = Math.min(filters.page, last);
-  const offset = (page - 1) * PAGE_SIZE;
-
-  const rows = await applyFilters(supabase.from("expenses").select(EXPENSE_COLUMNS), user.id, filters)
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .order("id")
-    .range(offset, offset + PAGE_SIZE - 1);
+  const rows = page === filters.page ? firstTry : await fetchPage(page);
   if (rows.error) throw new Error(`経費を読み込めませんでした: ${rows.error.message}`);
 
-  return { rows: rows.data, count, total, page, lastPage: last };
+  return { rows: rows.data, count, total, truncated: count > amounts.data.length, page, lastPage: last };
 }
 
-/** Every expense matching the filters (no paging), oldest first, for CSV export. */
+export class TooManyRowsError extends Error {}
+
+/**
+ * Every expense matching the filters (no paging), oldest first, for CSV export.
+ * Throws TooManyRowsError instead of silently cutting the file at MAX_ROWS.
+ */
 export async function listExpensesForExport(filters: ExpenseFilters): Promise<ExpenseRow[]> {
   const user = await getCurrentUser();
   const supabase = await createClient();
-  const { data, error } = await applyFilters(supabase.from("expenses").select(EXPENSE_COLUMNS), user.id, filters)
+  const { data, error, count } = await applyFilters(
+    supabase.from("expenses").select(EXPENSE_COLUMNS, { count: "exact" }),
+    user.id,
+    filters,
+  )
     .order("date", { ascending: true })
     .order("created_at", { ascending: true })
     .order("id")
     .limit(MAX_ROWS);
   if (error) throw new Error(`経費を読み込めませんでした: ${error.message}`);
+  if ((count ?? 0) > data.length) throw new TooManyRowsError(`${count}件は一度に出力できません`);
   return data;
 }
