@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import { ErrorCode, useDropzone, type FileRejection } from "react-dropzone";
 import { buttonClassName } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
@@ -26,6 +26,12 @@ type Item = {
 
 /** How many files are sent to Storage at the same time. */
 const CONCURRENCY = 3;
+
+/** react-dropzone accept maps, computed once. */
+const ACCEPT: Record<UploadGroup, Record<string, string[]>> = {
+  statement: dropzoneAccept("statement"),
+  receipt: dropzoneAccept("receipt"),
+};
 
 const STATUS_TEXT: Record<ItemStatus, string> = {
   uploading: "送信中…",
@@ -59,9 +65,18 @@ async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T
   await Promise.all(runners);
 }
 
+/** One-line progress summary for screen readers, e.g. "5件中3件完了、1件失敗". */
+function summarise(items: Item[]): string {
+  const finished = items.filter((item) => item.status !== "uploading").length;
+  const failed = items.filter((item) => item.status === "error").length;
+  const base = `${items.length}件中${finished}件完了`;
+  return failed > 0 ? `${base}、${failed}件失敗` : base;
+}
+
 export function UploadPanel() {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
+  const nextKey = useRef(0);
   const busy = items.some((item) => item.status === "uploading");
 
   const update = useCallback((key: string, patch: Partial<Item>) => {
@@ -70,9 +85,9 @@ export function UploadPanel() {
 
   const handleDrop = useCallback(
     async (group: UploadGroup, accepted: File[], rejections: FileRejection[]) => {
-      const batch = `${Date.now()}`;
-      const rejectedItems: Item[] = rejections.map((rejection, i) => ({
-        key: `${batch}-r${i}`,
+      const newKey = () => `item-${nextKey.current++}`;
+      const rejectedItems: Item[] = rejections.map((rejection) => ({
+        key: newKey(),
         name: rejection.file.name,
         status: "error",
         message: rejectionReason(rejection, group),
@@ -80,15 +95,15 @@ export function UploadPanel() {
 
       // Same rules the server applies; catches what the dropzone's MIME check lets through.
       const candidates: { file: File; key: string }[] = [];
-      accepted.forEach((file, i) => {
-        const key = `${batch}-a${i}`;
+      for (const file of accepted) {
+        const key = newKey();
         const check = checkFile(file, group);
         if (check.ok) {
           candidates.push({ file, key });
         } else {
           rejectedItems.push({ key, name: file.name, status: "error", message: check.reason });
         }
-      });
+      }
 
       setItems((current) => [
         ...candidates.map(({ file, key }) => ({ key, name: file.name, status: "uploading" as const })),
@@ -97,40 +112,56 @@ export function UploadPanel() {
       ]);
       if (candidates.length === 0) return;
 
-      const prepared = await prepareUploads({
-        group,
-        files: candidates.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
-      }).catch(() => ({ ok: false as const, error: "通信に失敗しました。もう一度お試しください。" }));
+      const failAll = (message: string) => {
+        for (const { key } of candidates) update(key, { status: "error", message });
+      };
 
-      if (!prepared.ok) {
-        for (const { key } of candidates) update(key, { status: "error", message: prepared.error });
-        return;
-      }
-      for (const { index, reason } of prepared.rejected) {
-        update(candidates[index].key, { status: "error", message: reason });
-      }
-
-      const supabase = createClient();
-      await runWithConcurrency(prepared.prepared, CONCURRENCY, async (target) => {
-        const { file, key } = candidates[target.index];
-        const { error } = await supabase.storage
-          .from("uploads")
-          .upload(target.storagePath, file, { contentType: target.contentType, upsert: false });
-
-        const result = await completeUpload({ uploadId: target.uploadId, uploaded: !error }).catch(
-          () => ({ ok: false as const, error: "通信に失敗しました。" }),
-        );
-        if (error || !result.ok || result.status === "failed") {
-          update(key, {
-            status: "error",
-            message: result.ok ? "ファイルを保存できませんでした" : result.error,
-          });
-        } else {
-          update(key, { status: result.status === "processing" ? "processing" : "done" });
+      try {
+        const prepared = await prepareUploads({
+          group,
+          files: candidates.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
+        });
+        if (!prepared.ok) {
+          failAll(prepared.error);
+          return;
         }
-      });
+        for (const { index, reason } of prepared.rejected) {
+          update(candidates[index].key, { status: "error", message: reason });
+        }
 
-      router.refresh();
+        const supabase = createClient();
+        await runWithConcurrency(prepared.prepared, CONCURRENCY, async (target) => {
+          const { file, key } = candidates[target.index];
+          try {
+            const { error } = await supabase.storage
+              .from("uploads")
+              .upload(target.storagePath, file, { contentType: target.contentType, upsert: false });
+            const result = await completeUpload({ uploadId: target.uploadId, uploaded: !error });
+            if (!result.ok) {
+              update(key, { status: "error", message: result.error });
+            } else if (error || result.status === "failed") {
+              update(key, { status: "error", message: "ファイルを保存できませんでした" });
+            } else {
+              update(key, { status: result.status === "processing" ? "processing" : "done" });
+            }
+          } catch {
+            // Reading the file or the network failed: report it, keep the others going.
+            update(key, { status: "error", message: "送信に失敗しました" });
+          }
+        });
+      } catch {
+        failAll("通信に失敗しました。もう一度お試しください。");
+      } finally {
+        // Anything still marked as uploading has no result coming; never leave the zones locked.
+        setItems((current) =>
+          current.map((item) =>
+            candidates.some((c) => c.key === item.key) && item.status === "uploading"
+              ? { ...item, status: "error", message: "送信に失敗しました" }
+              : item,
+          ),
+        );
+        router.refresh();
+      }
     },
     [router, update],
   );
@@ -175,9 +206,15 @@ export function UploadPanel() {
       </div>
 
       {items.length > 0 ? (
-        <section aria-label="送信状況" className="border border-line bg-white px-6 py-4">
-          <div className="mb-2 flex items-baseline">
-            <h2 className="text-[11.5px] font-semibold tracking-[0.16em] text-muted">送信状況</h2>
+        <section aria-labelledby="upload-progress-title" className="border border-line bg-white px-6 py-4">
+          <div className="mb-2 flex items-baseline gap-3">
+            <h2 id="upload-progress-title" className="text-[11.5px] font-semibold tracking-[0.16em] text-muted">
+              送信状況
+            </h2>
+            {/* Only the summary is live, so a 20-file drop is not read out line by line. */}
+            <p role="status" className="num text-xs text-muted">
+              {summarise(items)}
+            </p>
             {!busy ? (
               <button
                 type="button"
@@ -188,7 +225,7 @@ export function UploadPanel() {
               </button>
             ) : null}
           </div>
-          <ul aria-live="polite" className="flex flex-col">
+          <ul className="flex flex-col">
             {items.map((item) => (
               <li
                 key={item.key}
@@ -242,12 +279,15 @@ function DropZone({
   disabled,
   onDrop,
 }: DropZoneProps) {
+  const titleId = useId();
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    accept: dropzoneAccept(group),
+    accept: ACCEPT[group],
     maxSize: MAX_FILE_BYTES,
     maxFiles: UPLOAD_GROUPS[group].maxFiles,
     multiple: true,
+    // Keyboard and click users go through the button; the zone is for dragging.
     noClick: true,
+    noKeyboard: true,
     disabled,
     onDrop: (accepted, rejections) => onDrop(group, accepted, rejections),
   });
@@ -255,7 +295,8 @@ function DropZone({
   return (
     <div
       {...getRootProps({
-        "aria-label": `${title}をアップロード`,
+        role: "group",
+        "aria-labelledby": titleId,
         className: [
           "flex flex-col items-center border-[1.5px] border-dashed px-8 pt-11 pb-[38px] text-center transition-colors",
           isDragActive ? "border-primary bg-primary-soft" : "border-sky bg-white",
@@ -263,14 +304,16 @@ function DropZone({
         ].join(" "),
       })}
     >
-      <input {...getInputProps({ "aria-label": `${title}を選択` })} />
+      <input {...getInputProps()} />
       <span
         aria-hidden
         className="mb-[18px] inline-flex size-[52px] items-center justify-center border border-primary font-serif text-2xl font-bold text-primary"
       >
         {glyph}
       </span>
-      <p className="mb-1.5 font-serif text-[17px] font-bold tracking-[0.08em]">{title}</p>
+      <p id={titleId} className="mb-1.5 font-serif text-[17px] font-bold tracking-[0.08em]">
+        {title}
+      </p>
       <p className="mb-[22px] text-[12.5px] leading-[1.9] text-muted">{description}</p>
       <button
         type="button"

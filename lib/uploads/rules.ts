@@ -93,7 +93,7 @@ export function checkFile(file: FileDescriptor, group: UploadGroup): FileCheck {
     return { ok: false, reason: `対応していない形式です（${extensionsLabel(group)}）` };
   }
   if (!rule.acceptedMimeTypes.includes(file.type)) {
-    return { ok: false, reason: "ファイルの中身が拡張子と一致しません" };
+    return { ok: false, reason: "ファイルの種類が拡張子と一致しません" };
   }
   if (!Number.isSafeInteger(file.size) || file.size <= 0) {
     return { ok: false, reason: "空のファイルはアップロードできません" };
@@ -102,6 +102,11 @@ export function checkFile(file: FileDescriptor, group: UploadGroup): FileCheck {
     return { ok: false, reason: "ファイルサイズが10MBを超えています" };
   }
   return { ok: true, kind: rule.kind, extension, contentType: rule.contentType };
+}
+
+/** Content-Type stored for an extension, or null when it is not accepted. */
+export function contentTypeFor(extension: string): string | null {
+  return EXTENSIONS[extension]?.contentType ?? null;
 }
 
 /**

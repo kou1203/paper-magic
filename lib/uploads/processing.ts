@@ -14,6 +14,9 @@ export type UploadToProcess = Pick<Tables<"uploads">, "id" | "kind" | "storage_p
  * - pdf / image → KO-11 (read the receipt with AI, insert pending_review expenses)
  *
  * Each importer must move the upload to `completed`, `needs_review` or `failed`.
+ * Importers must not trust the stored bytes: check the file signature (magic
+ * bytes) before parsing, e.g. `%PDF-`, `FF D8 FF` (JPEG), `89 50 4E 47` (PNG),
+ * `50 4B 03 04` (xlsx).
  */
 export async function startProcessing(
   _supabase: SupabaseClient<Database>,

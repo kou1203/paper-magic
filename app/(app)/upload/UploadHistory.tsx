@@ -15,15 +15,18 @@ type HistoryRow = Pick<
   "id" | "kind" | "file_name" | "status" | "row_count" | "error_message" | "created_at"
 >;
 
-const COLUMNS = "flex items-center gap-3.5";
+const HEAD = "py-2.5 font-semibold";
+const CELL = "py-[13px] align-middle";
 
 /** Upload history, newest first. Reads the session, so render inside Suspense. */
 export async function UploadHistory() {
-  await getCurrentUser();
+  const user = await getCurrentUser();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("uploads")
     .select("id, kind, file_name, status, row_count, error_message, created_at")
+    // Explicit owner filter (RLS enforces it too) so uploads_user_created_idx is used.
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     // Files from one drop share a timestamp; keep their order stable.
     .order("file_name", { ascending: true })
@@ -41,15 +44,23 @@ export async function UploadHistory() {
           まだアップロードはありません。上の枠にファイルをドロップしてください。
         </p>
       ) : (
-        <table className="w-full text-[13px]">
+        <table className="w-full table-fixed border-collapse text-[13px]">
+          <colgroup>
+            <col className="w-[58px]" />
+            <col />
+            <col className="w-[84px]" />
+            <col className="w-[164px]" />
+            <col className="w-[110px]" />
+            <col className="w-[92px]" />
+          </colgroup>
           <thead>
-            <tr className={`${COLUMNS} border-b border-line py-2.5 text-[11px] font-semibold tracking-[0.12em] text-muted`}>
-              <th scope="col" className="w-11 shrink-0 text-left font-semibold">種別</th>
-              <th scope="col" className="min-w-0 flex-1 text-left font-semibold">ファイル</th>
-              <th scope="col" className="w-[70px] shrink-0 text-right font-semibold">件数</th>
-              <th scope="col" className="w-[150px] shrink-0 text-left font-semibold">日時</th>
-              <th scope="col" className="w-24 shrink-0 text-center font-semibold">状態</th>
-              <th scope="col" className="w-20 shrink-0 font-semibold">
+            <tr className="border-b border-line text-[11px] tracking-[0.12em] text-muted">
+              <th scope="col" className={`${HEAD} text-left`}>種別</th>
+              <th scope="col" className={`${HEAD} text-left`}>ファイル</th>
+              <th scope="col" className={`${HEAD} text-right`}>件数</th>
+              <th scope="col" className={`${HEAD} pl-3.5 text-left`}>日時</th>
+              <th scope="col" className={`${HEAD} text-center`}>状態</th>
+              <th scope="col" className={HEAD}>
                 <span className="sr-only">操作</span>
               </th>
             </tr>
@@ -68,11 +79,11 @@ export async function UploadHistory() {
 function HistoryItem({ row }: { row: HistoryRow }) {
   const counted = row.status === "completed" || row.status === "needs_review";
   return (
-    <tr className={`${COLUMNS} border-b border-dashed border-line py-[13px] last:border-b-0`}>
-      <td className="w-11 shrink-0">
+    <tr className="border-b border-dashed border-line last:border-b-0">
+      <td className={CELL}>
         <KindTag kind={row.kind} />
       </td>
-      <td className="min-w-0 flex-1">
+      <td className={`${CELL} pl-1`}>
         <span className="block truncate" title={row.file_name}>
           {row.file_name}
         </span>
@@ -80,12 +91,12 @@ function HistoryItem({ row }: { row: HistoryRow }) {
           <span className="block text-xs text-muted">{row.error_message}</span>
         ) : null}
       </td>
-      <td className="num w-[70px] shrink-0 text-right">{counted ? `${row.row_count}件` : "—"}</td>
-      <td className="num w-[150px] shrink-0 text-muted">{formatDateTime(row.created_at)}</td>
-      <td className="w-24 shrink-0 text-center">
+      <td className={`${CELL} num text-right`}>{counted ? `${row.row_count}件` : "—"}</td>
+      <td className={`${CELL} num pl-3.5 text-muted`}>{formatDateTime(row.created_at)}</td>
+      <td className={`${CELL} text-center`}>
         <StatusBadge status={row.status} />
       </td>
-      <td className="w-20 shrink-0 text-right">
+      <td className={`${CELL} text-right`}>
         <HistoryLink row={row} />
       </td>
     </tr>
