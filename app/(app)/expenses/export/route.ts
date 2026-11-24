@@ -18,10 +18,15 @@ export async function GET(request: NextRequest) {
   }
 
   const filters = parseExpenseFilters(Object.fromEntries(request.nextUrl.searchParams), new Date());
-  let rows;
-  try {
-    rows = await listExpensesForExport(filters);
-  } catch (error) {
+  const [rowsResult, categories] = await Promise.all([
+    listExpensesForExport(filters).then(
+      (rows) => ({ ok: true as const, rows }),
+      (error: unknown) => ({ ok: false as const, error }),
+    ),
+    listCategories(),
+  ]);
+  if (!rowsResult.ok) {
+    const { error } = rowsResult;
     if (error instanceof TooManyRowsError) {
       return new NextResponse(
         `出力できるのは一度に${MAX_ROWS.toLocaleString("ja-JP")}件までです。期間や条件を絞ってください。`,
@@ -30,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
     throw error;
   }
-  const categories = await listCategories();
+  const rows = rowsResult.rows;
   const names = new Map(categories.map((c) => [c.id, c.name]));
 
   const csv = toExpensesCsv(

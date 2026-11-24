@@ -25,8 +25,11 @@ export type Category = Pick<Tables<"account_categories">, "id" | "code" | "name"
 const EXPENSE_COLUMNS =
   "id, date, description, vendor, category_id, source, amount_jpy, tax_type, status, invoice_number, upload_id";
 
-/** Upper bound for the totals query and the CSV export. */
-export const MAX_ROWS = 5000;
+/**
+ * Upper bound for the totals query and the CSV export. Matches PostgREST's
+ * max_rows (1000 on Supabase): a larger .limit() would be capped silently.
+ */
+export const MAX_ROWS = 1000;
 
 /** All account categories in display order. Deduplicated per request. */
 export const listCategories = cache(async (): Promise<Category[]> => {

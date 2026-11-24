@@ -54,10 +54,13 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   }
 
   if (!signedIn && isDataPath(pathname)) {
-    return new NextResponse("ログインが必要です。", {
+    const unauthorized = new NextResponse("ログインが必要です。", {
       status: 401,
       headers: { ...authHeaders, "Cache-Control": "private, no-store" },
     });
+    // Carry cookie updates too (e.g. clearing an invalid session).
+    for (const cookie of response.cookies.getAll()) unauthorized.cookies.set(cookie);
+    return unauthorized;
   }
 
   if (!signedIn && !isPublicPath(pathname)) {
