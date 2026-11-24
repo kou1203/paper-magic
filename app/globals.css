@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/*
+ * Paper Magic design tokens, taken from Paper+Magic+UI.html.
+ * Corners stay square. Headings and amounts use Mincho; body text uses Gothic.
+ */
+@theme {
+  --color-navy: #10233c;
+  --color-navy-line: #24405f;
+  --color-navy-raised: #1f3d63;
+  --color-primary: #1d6fe0;
+  --color-primary-hover: #1659b8;
+  --color-primary-text: #1b5fb8;
+  --color-primary-soft: #e3edfa;
+  --color-sky: #8fb4e8;
+  --color-slate: #93a5bd;
+  --color-mist: #b9c7d8;
+  --color-paper: #f7f9fb;
+  --color-canvas: #edf1f5;
+  --color-line: #dbe1e9;
+  --color-ink: #1a2537;
+  --color-muted: #5c6b80;
+  --color-sidebar-text: #e8edf3;
+  --color-success: #2e7d5b;
+  --color-success-line: #9cc5b3;
+
+  --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
+    "Noto Sans JP", Meiryo, sans-serif;
+  --font-serif: "Hiragino Mincho ProN", "Yu Mincho", serif;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+}
+
+/* Tabular figures for amounts, dates and counts. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
