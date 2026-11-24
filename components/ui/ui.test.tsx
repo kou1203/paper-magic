@@ -46,4 +46,11 @@ describe("MonthSwitcher", () => {
       "/dashboard?month=2025-02",
     );
   });
+
+  it("drops the link at the edge of the supported range", () => {
+    render(<MonthSwitcher month="2099-12" basePath="/expenses" />);
+    expect(screen.getByRole("link", { name: "前の月（2099年11月）" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /次の月/ })).not.toBeInTheDocument();
+    expect(screen.getByText("次の月はありません")).toBeInTheDocument();
+  });
 });

@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { Sidebar, type SidebarUser } from "@/components/layout/Sidebar";
 
 // Placeholder until authentication lands in KO-6.
 const GUEST_USER: SidebarUser = { name: "ゲスト", plan: "個人事業主プラン" };
 
-export default function AppLayout({ children }: LayoutProps<"/">) {
+export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar user={GUEST_USER} />

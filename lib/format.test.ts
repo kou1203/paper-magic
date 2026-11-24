@@ -29,7 +29,19 @@ describe("isYearMonth", () => {
     expect(isYearMonth(value)).toBe(true);
   });
 
-  it.each(["2026-6", "2026-13", "2026-00", "202606", "", undefined, ["2026-06"]])(
+  it.each([
+    "2026-6",
+    "2026-13",
+    "2026-00",
+    "202606",
+    "",
+    undefined,
+    ["2026-06"],
+    "0000-01",
+    "1999-12",
+    "2100-01",
+    "9999-12",
+  ])(
     "rejects %j",
     (value) => {
       expect(isYearMonth(value)).toBe(false);
@@ -56,19 +68,25 @@ describe("shiftYearMonth", () => {
     expect(shiftYearMonth("2025-01", -13)).toBe("2023-12");
   });
 
+  it("returns null instead of leaving the supported range", () => {
+    expect(shiftYearMonth("2000-01", -1)).toBeNull();
+    expect(shiftYearMonth("2099-12", 1)).toBeNull();
+    expect(shiftYearMonth("2000-02", -1)).toBe("2000-01");
+  });
+
   it("rejects fractional deltas", () => {
     expect(() => shiftYearMonth("2026-06", 0.5)).toThrow(RangeError);
   });
 });
 
 describe("resolveYearMonth", () => {
-  const now = new Date(2026, 10, 24);
+  const now = new Date("2026-11-24T03:00:00Z");
 
   it("uses a valid query value", () => {
     expect(resolveYearMonth("2024-06", now)).toBe("2024-06");
   });
 
-  it.each([undefined, "", "2024-6", "junk", ["2024-06", "2024-07"]])(
+  it.each([undefined, "", "2024-6", "junk", ["2024-06", "2024-07"], "0000-01", "9999-12"])(
     "falls back to the current month for %j",
     (value) => {
       expect(resolveYearMonth(value, now)).toBe("2026-11");
@@ -78,6 +96,13 @@ describe("resolveYearMonth", () => {
 
 describe("yearMonthOf", () => {
   it("pads the month", () => {
-    expect(yearMonthOf(new Date(2024, 0, 31))).toBe("2024-01");
+    expect(yearMonthOf(new Date("2024-01-15T03:00:00Z"))).toBe("2024-01");
+  });
+
+  it("uses Japan time, not the server's time zone", () => {
+    // 2024-07-01 00:30 in Tokyo is still June 30 in UTC.
+    const firstOfMonthInTokyo = new Date("2024-06-30T15:30:00Z");
+    expect(yearMonthOf(firstOfMonthInTokyo)).toBe("2024-07");
+    expect(yearMonthOf(firstOfMonthInTokyo, "UTC")).toBe("2024-06");
   });
 });

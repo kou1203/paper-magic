@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // Tailwind v4 runs through its Turbopack loader (create-next-app 16 default),
+  // so there is no postcss.config.mjs.
   turbopack: {
     rules: {
       "*.css": {
