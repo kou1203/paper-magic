@@ -107,6 +107,19 @@ begin
   perform pg_temp.check(blocked, 'B cannot attach an expense to A upload');
 
   begin
+    insert into public.uploads (kind, file_name, storage_path)
+    values ('csv', 'squat.csv', user_a || '/u1/a.csv');
+    blocked := false;
+  exception when check_violation then
+    blocked := true;
+  end;
+  perform pg_temp.check(blocked, 'B cannot register a path in A folder');
+
+  insert into public.uploads (kind, file_name, storage_path)
+  values ('csv', 'a.csv', user_b || '/u1/a.csv');
+  perform pg_temp.check(true, 'B can use the same file name in own folder');
+
+  begin
     insert into storage.objects (bucket_id, name)
     values ('uploads', user_a || '/u1/evil.csv');
     blocked := false;

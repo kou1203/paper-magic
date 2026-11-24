@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { AUTH_CALLBACK_PATH, HOME_PATH, LOGIN_PATH, isPublicPath, loginPathFor } from "@/lib/auth/paths";
+import { AUTH_CALLBACK_PATH, LOGIN_PATH, isPublicPath, loginPathFor, safeNextPath } from "@/lib/auth/paths";
 import type { Database } from "./database.types";
 import { getSupabaseEnv } from "./env";
 
@@ -15,6 +15,9 @@ import { getSupabaseEnv } from "./env";
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   const { url, publishableKey } = getSupabaseEnv();
   let response = NextResponse.next({ request });
+  // Headers Supabase asks us to send whenever it sets auth cookies
+  // (Cache-Control: private, no-store, ...), so no shared cache stores them.
+  const authHeaders: Record<string, string> = {};
 
   const supabase = createServerClient<Database>(url, publishableKey, {
     cookies: {
@@ -29,6 +32,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }
+        Object.assign(authHeaders, headers);
         for (const [key, value] of Object.entries(headers)) {
           response.headers.set(key, value);
         }
@@ -46,29 +50,34 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // Email links fall back to the Site URL ("/?code=...") when the callback URL
   // is not on Supabase's redirect allow list. Forward them to the callback.
   if (pathname === "/" && searchParams.has("code")) {
-    return redirectKeepingCookies(request, response, `${AUTH_CALLBACK_PATH}${search}`);
+    return redirectKeepingSession(request, response, authHeaders, `${AUTH_CALLBACK_PATH}${search}`);
   }
 
   if (!signedIn && !isPublicPath(pathname)) {
-    return redirectKeepingCookies(request, response, loginPathFor(`${pathname}${search}`));
+    return redirectKeepingSession(request, response, authHeaders, loginPathFor(`${pathname}${search}`));
   }
 
   if (signedIn && pathname === LOGIN_PATH) {
-    return redirectKeepingCookies(request, response, HOME_PATH);
+    const next = safeNextPath(searchParams.get("next"));
+    return redirectKeepingSession(request, response, authHeaders, next);
   }
 
   return response;
 }
 
-/** Redirect that still carries any refreshed session cookies. */
-function redirectKeepingCookies(
+/** Redirect that still carries any refreshed session cookies and their cache headers. */
+function redirectKeepingSession(
   request: NextRequest,
   from: NextResponse,
+  authHeaders: Record<string, string>,
   path: string,
 ): NextResponse {
   const redirect = NextResponse.redirect(new URL(path, request.url));
   for (const cookie of from.cookies.getAll()) {
     redirect.cookies.set(cookie);
+  }
+  for (const [key, value] of Object.entries(authHeaders)) {
+    redirect.headers.set(key, value);
   }
   return redirect;
 }

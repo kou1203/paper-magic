@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/credentials";
 import { buttonClassName } from "@/components/ui/Button";
 import { signIn, signUp, type AuthFormState } from "./actions";
@@ -14,20 +14,18 @@ const MODES: { value: Mode; label: string }[] = [
 
 export function LoginForm({ next, linkFailed }: { next: string; linkFailed: boolean }) {
   const [mode, setMode] = useState<Mode>("signIn");
-  const panelId = useId();
 
   return (
     <div>
-      <div role="tablist" aria-label="ログイン方法" className="mb-6 grid grid-cols-2 border-b border-line">
+      {/* Two toggle buttons rather than ARIA tabs: simpler, and fully keyboard-usable. */}
+      <div role="group" aria-label="ログイン方法" className="mb-6 grid grid-cols-2 border-b border-line">
         {MODES.map((item) => {
           const selected = item.value === mode;
           return (
             <button
               key={item.value}
               type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={panelId}
+              aria-pressed={selected}
               onClick={() => setMode(item.value)}
               className={[
                 "-mb-px border-b-2 pb-2.5 text-[13px] font-semibold tracking-[0.08em] transition-colors cursor-pointer",
@@ -39,10 +37,8 @@ export function LoginForm({ next, linkFailed }: { next: string; linkFailed: bool
           );
         })}
       </div>
-      <div id={panelId} role="tabpanel">
-        {/* Remount on mode change so each form keeps its own state. */}
-        <CredentialsForm key={mode} mode={mode} next={next} linkFailed={linkFailed} />
-      </div>
+      {/* Remount on mode change so each form keeps its own state. */}
+      <CredentialsForm key={mode} mode={mode} next={next} linkFailed={linkFailed} />
     </div>
   );
 }
@@ -54,6 +50,15 @@ function CredentialsForm({ mode, next, linkFailed }: { mode: Mode; next: string;
   );
   const emailId = useId();
   const passwordId = useId();
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  // After a failed submit, move focus to the first field that needs fixing so
+  // keyboard and screen-reader users land on it (its error is aria-describedby).
+  useEffect(() => {
+    if (state.fieldErrors?.email) emailRef.current?.focus();
+    else if (state.fieldErrors?.password) passwordRef.current?.focus();
+  }, [state]);
 
   return (
     <form action={formAction} noValidate className="flex flex-col gap-4">
@@ -76,6 +81,7 @@ function CredentialsForm({ mode, next, linkFailed }: { mode: Mode; next: string;
         error={state.fieldErrors?.email}
         input={
           <input
+            ref={emailRef}
             id={emailId}
             name="email"
             type="email"
@@ -95,6 +101,7 @@ function CredentialsForm({ mode, next, linkFailed }: { mode: Mode; next: string;
         error={state.fieldErrors?.password}
         input={
           <input
+            ref={passwordRef}
             id={passwordId}
             name="password"
             type="password"

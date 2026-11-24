@@ -17,6 +17,19 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/expenses?month=2024-06")).toBe("/expenses?month=2024-06");
   });
 
+  it("returns the normalised path when dot segments stay on this site", () => {
+    expect(safeNextPath("/upload/../expenses")).toBe("/expenses");
+  });
+
+  it("never returns a protocol-relative path", () => {
+    const attempts = ["/..//evil.example", "/%2e%2e//evil.example", "/a/..//evil.example/x"];
+    for (const attempt of attempts) {
+      const result = safeNextPath(attempt);
+      expect(result.startsWith("//")).toBe(false);
+      expect(new URL(result, "http://localhost:3000").host).toBe("localhost:3000");
+    }
+  });
+
   it.each([
     undefined,
     null,
@@ -29,6 +42,12 @@ describe("safeNextPath", () => {
     "javascript:alert(1)",
     "/\t/evil.example",
     "/\n/evil.example",
+    "/..//evil.example",
+    "/.//evil.example",
+    "/%2e%2e//evil.example",
+    "/%2E%2E//evil.example",
+    "/a/..//evil.example/x",
+    "/a/b/../..//evil.example",
     "/login",
     "/auth/callback?code=x",
     `/${"a".repeat(3000)}`,

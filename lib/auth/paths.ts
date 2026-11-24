@@ -30,14 +30,18 @@ export function safeNextPath(next: string | string[] | null | undefined): string
     return HOME_PATH;
   }
   const url = new URL(next, "http://paper-magic.invalid");
-  if (url.origin !== "http://paper-magic.invalid") {
+  const path = `${url.pathname}${url.search}`;
+  // Check the *normalised* path again: dot segments can collapse
+  // "/..//evil.example" or "/%2e%2e//evil.example" into "//evil.example",
+  // which browsers treat as another host.
+  if (url.origin !== "http://paper-magic.invalid" || path.startsWith("//") || path.includes("\\")) {
     return HOME_PATH;
   }
   // Never bounce back into the auth screens.
   if (isPublicPath(url.pathname)) {
     return HOME_PATH;
   }
-  return `${url.pathname}${url.search}`;
+  return path;
 }
 
 /** Login URL that returns to `pathname` (plus query) after sign-in. */

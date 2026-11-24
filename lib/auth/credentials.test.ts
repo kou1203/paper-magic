@@ -35,8 +35,18 @@ describe("parseCredentials", () => {
     }
   });
 
-  it("rejects passwords longer than bcrypt can hash", () => {
-    const result = parseCredentials(form({ email: "a@example.com", password: "x".repeat(73) }));
+  it("limits passwords to the 72 bytes bcrypt can hash", () => {
+    const ok = parseCredentials(form({ email: "a@example.com", password: "x".repeat(72) }));
+    expect(ok.ok).toBe(true);
+    const tooLong = parseCredentials(form({ email: "a@example.com", password: "x".repeat(73) }));
+    expect(tooLong.ok).toBe(false);
+  });
+
+  it("counts full-width characters by their UTF-8 bytes", () => {
+    // 24 characters x 3 bytes = 72 bytes: allowed. 25 characters: rejected.
+    expect(parseCredentials(form({ email: "a@example.com", password: "経".repeat(24) })).ok).toBe(true);
+    const result = parseCredentials(form({ email: "a@example.com", password: "経".repeat(25) }));
     expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors.password).toContain("長すぎます");
   });
 });
