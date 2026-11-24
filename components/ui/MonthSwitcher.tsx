@@ -5,6 +5,8 @@ type MonthSwitcherProps = {
   month: YearMonth;
   /** Page the arrows link to. The month is passed as `?month=YYYY-MM`. */
   basePath: string;
+  /** Other query values to keep when changing month (e.g. list filters). */
+  query?: Record<string, string>;
 };
 
 const ARROW =
@@ -13,10 +15,12 @@ const ARROW =
 function MonthArrow({
   target,
   basePath,
+  query,
   direction,
 }: {
   target: YearMonth | null;
   basePath: string;
+  query?: Record<string, string>;
   direction: "prev" | "next";
 }) {
   const glyph = direction === "prev" ? "‹" : "›";
@@ -34,7 +38,7 @@ function MonthArrow({
 
   return (
     <Link
-      href={{ pathname: basePath, query: { month: target } }}
+      href={{ pathname: basePath, query: { ...query, month: target } }}
       className={ARROW}
       aria-label={`${word}（${formatYearMonth(target)}）`}
     >
@@ -44,14 +48,14 @@ function MonthArrow({
 }
 
 /** ‹ 2026年6月 › — moves between months by changing the `month` query. */
-export function MonthSwitcher({ month, basePath }: MonthSwitcherProps) {
+export function MonthSwitcher({ month, basePath, query }: MonthSwitcherProps) {
   return (
     <div className="flex items-center border border-line bg-paper">
-      <MonthArrow target={shiftYearMonth(month, -1)} basePath={basePath} direction="prev" />
+      <MonthArrow target={shiftYearMonth(month, -1)} basePath={basePath} query={query} direction="prev" />
       <span className="num px-2.5 font-serif text-sm font-bold tracking-[0.08em]">
         {formatYearMonth(month)}
       </span>
-      <MonthArrow target={shiftYearMonth(month, 1)} basePath={basePath} direction="next" />
+      <MonthArrow target={shiftYearMonth(month, 1)} basePath={basePath} query={query} direction="next" />
     </div>
   );
 }
