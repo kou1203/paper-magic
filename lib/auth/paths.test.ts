@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOME_PATH, isPublicPath, loginPathFor, safeNextPath } from "./paths";
+import { HOME_PATH, isDataPath, isPublicPath, loginPathFor, safeNextPath } from "./paths";
 
 describe("isPublicPath", () => {
   it.each(["/login", "/auth/callback", "/auth/callback/extra"])("treats %s as public", (path) => {
@@ -66,5 +66,13 @@ describe("loginPathFor", () => {
   it("omits next for the default page", () => {
     expect(loginPathFor("/dashboard")).toBe("/login");
     expect(loginPathFor("/")).toBe("/login?next=%2F");
+  });
+});
+
+describe("isDataPath", () => {
+  it("marks the CSV export only", () => {
+    expect(isDataPath("/expenses/export")).toBe(true);
+    expect(isDataPath("/expenses")).toBe(false);
+    expect(isDataPath("/expenses/export/x")).toBe(false);
   });
 });

@@ -47,6 +47,13 @@ describe("MonthSwitcher", () => {
     );
   });
 
+  it("keeps other query values when changing month", () => {
+    render(<MonthSwitcher month="2024-06" basePath="/expenses" query={{ category: "3", q: "AI" }} />);
+    const href = screen.getByRole("link", { name: "次の月（2024年7月）" }).getAttribute("href");
+    const params = new URL(href ?? "", "http://x").searchParams;
+    expect(Object.fromEntries(params)).toEqual({ category: "3", q: "AI", month: "2024-07" });
+  });
+
   it("drops the link at the edge of the supported range", () => {
     render(<MonthSwitcher month="2099-12" basePath="/expenses" />);
     expect(screen.getByRole("link", { name: "前の月（2099年11月）" })).toBeInTheDocument();

@@ -11,6 +11,16 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /**
+ * Endpoints that return files or data rather than pages. Signed-out requests
+ * get 401 instead of a redirect, so a download never saves the login page.
+ */
+const DATA_PATHS = ["/expenses/export"] as const;
+
+export function isDataPath(pathname: string): boolean {
+  return DATA_PATHS.some((path) => pathname === path);
+}
+
+/**
  * Turns an untrusted `next` value into a same-origin path, so redirects after
  * sign-in cannot send the user to another site. Anything suspicious becomes
  * HOME_PATH.
