@@ -76,6 +76,37 @@ export function yearMonthOf(date: Date, timeZone: string = APP_TIME_ZONE): YearM
   return toYearMonth(year, month);
 }
 
+const DATE_TIME_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function tokyoParts(date: Date): Record<"year" | "month" | "day" | "hour" | "minute", string> {
+  const parts = Object.fromEntries(
+    DATE_TIME_PARTS.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  return { year: parts.year, month: parts.month, day: parts.day, hour: parts.hour, minute: parts.minute };
+}
+
+/**
+ * Formats a timestamp in Japan time as `6月24日 18:42`, adding the year
+ * (`2024年6月24日 18:42`) when it is not the current year.
+ */
+export function formatDateTime(value: string | Date, now: Date = new Date()): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError(`日時として解釈できません: ${String(value)}`);
+  }
+  const p = tokyoParts(date);
+  const time = `${p.month}月${p.day}日 ${p.hour}:${p.minute}`;
+  return p.year === tokyoParts(now).year ? time : `${p.year}年${time}`;
+}
+
 /**
  * Reads a `?month=` query value. Falls back to the current month (Japan time)
  * when the value is missing, repeated, malformed or out of range.
